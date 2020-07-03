@@ -2,14 +2,15 @@ module Quadhps
 using FastGaussQuadrature, FastClosures, StaticArrays
 
 
-struct _Helper
-  abstol::Float64
-  reltol::Float64
+struct _Helper{T}
+  abstol::T
+  reltol::T
   max_depth::Int
   split::Int
-  function _Helper(abstol::Number, reltol::Number, max_depth::Int, split::Int)
+  function _Helper(abstol::T, reltol::T, max_depth::Int, split::Int
+      ) where {T<:Real}
     @assert split > 0 && max_depth >= 0 "$split, $max_depth"
-    return new(Float64(abstol), Float64(reltol), max_depth, split)
+    return new{T}(abstol, reltol, max_depth, split)
   end
 end
 
@@ -55,9 +56,10 @@ end
   return applyquadrature(f, +, x, w) * normalisation
 end
 
-@inline function quad(f::T, h::_Helper, a::U, b::U, c::U, n::Int
-    ) where {T<:Function, U<:Real}
+@inline function quad(f::T, h::_Helper, a::Real, b::Real, c::Real, n::Int
+    ) where {T<:Function}
   @assert a < b < c "$a, $b, $c"
+  U = promote_type(typeof(a), typeof(b), typeof(c))
   @assert isapprox(b - a, c - b, rtol=sqrt(eps(U)), atol=0) "$a, $b, $c"
   x, w, normalisation = calculate_node_weight(h, n, a, b)
   b_a = b - a
@@ -65,8 +67,8 @@ end
   return applyquadrature(reductionop, +, x, w) * normalisation
 end
 
-@inline function hasconverged(a::T, b::T, h::_Helper, l::Int,
-    nrm::U) where {T, U<:Function}
+@inline function hasconverged(a, b, h::_Helper, l::Int,
+    nrm::T) where {T<:Function}
   all(@. nrm(a - b) < h.split^l * h.reltol * nrm(a + b) / 2) && return true
   all(@. nrm(a + b) / 2 <= h.abstol) && return true
   l > h.max_depth && return true
@@ -90,14 +92,14 @@ const default_split = 2
 const default_max_depth = 8
 
 function quadhp(f::T, a::Real, b::Real; norm::U=abs,
-                rtol::Real=eps(Float64), atol::Real=0.0,
+                rtol::Real=eps(), atol::Real=0.0,
                 order::Int=default_order, max_depth::Int=default_max_depth,
                 split::Int=default_split) where {T<:Function, U<:Function}
   return quadhp(f, _Helper(atol, rtol, max_depth, split), a, b, order, 0, norm)
 end
 
 function quadhp(f::T, ab::Real...; norm::U=abs,
-                rtol::Real=eps(Float64), atol::Real=0.0,
+                rtol::Real=eps(), atol::Real=0.0,
                 order::Int=default_order, max_depth::Int=default_max_depth,
                 split::Int=default_split) where {T<:Function, U<:Function}
   reductionop = @closure i -> quadhp(f, ab[i], ab[i+1], norm=norm, rtol=rtol,
