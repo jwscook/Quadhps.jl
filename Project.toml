@@ -4,7 +4,9 @@ authors = ["James Cook <cookjws@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+FastClosures = "9aa1b823-49e4-5ca5-8b0f-3971ec8bab6a"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [extras]
 QuadGK = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
