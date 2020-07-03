@@ -1,0 +1,12 @@
+name = "Quadhps"
+uuid = "142c3307-9952-42a8-a3b3-7e77f540d852"
+authors = ["James Cook <cookjws@gmail.com>"]
+version = "0.1.0"
+
+[extras]
+QuadGK = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["QuadGK", "SpecialFunctions", "Test"] 
