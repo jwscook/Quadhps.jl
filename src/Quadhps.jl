@@ -14,24 +14,25 @@ struct _Helper{T}
   end
 end
 
-const memo = Dict{Int64, Tuple{Array{Float64,1},Array{Float64,1},
-                               Array{Array{Float64,1},0}}}()
+#const memo = Dict{Int64, Tuple{Array{Float64,1},Array{Float64,1},
+#                               Array{Float64,1}}}()
+const memo = Dict()
 
 @inline function memoisedgausslengendre(n::Int)
   if !haskey(memo, n)
     x, w = FastGaussQuadrature.gausslegendre(n)
-    memo[n] = (x, w, [deepcopy(x) for i ∈ Threads.nthreads()])
+    memo[n] = (x, w)
   end
   return memo[n]
 end
 
 @inline function calculate_node_weight(h::_Helper, n::Int,
-    a::Number, b::Number)
-  x, w, work = memoisedgausslengendre(n)
-  halfdifference = (b - a) / 2
-  halfsum = (b + a) / 2
-  @. work[Threads.threadid()] = x * halfdifference + halfsum
-  return work[Threads.threadid()], w, halfdifference
+    a, b)
+  x, w = memoisedgausslengendre(n)
+  halfdifference = @. (b - a) / 2
+  halfsum = @. (b + a) / 2
+  y = @. x * halfdifference + halfsum
+  return y, w, halfdifference
 end
 
 @inline function simdmapreduce(f::T, op, iter) where {T<:Function}
@@ -50,20 +51,20 @@ end
   return output
 end
 
-@inline function quad(f::T, h::_Helper, a::Real, b::Real, n::Int
+@inline function quad(f::T, h::_Helper, a, b, n::Int
     ) where {T<:Function}
   x, w, normalisation = calculate_node_weight(h, n, a, b)
   return applyquadrature(f, +, x, w) * normalisation
 end
 
-@inline function quad(f::T, h::_Helper, a::Real, b::Real, c::Real, n::Int
+@inline function quad(f::T, h::_Helper, a, b, c, n::Int
     ) where {T<:Function}
   @assert a < b < c "$a, $b, $c"
   U = promote_type(typeof(a), typeof(b), typeof(c))
-  @assert isapprox(b - a, c - b, rtol=sqrt(eps(U)), atol=0) "$a, $b, $c"
+  @assert isapprox(b .- a, c .- b, rtol=sqrt(eps(U)), atol=0) "$a, $b, $c"
   x, w, normalisation = calculate_node_weight(h, n, a, b)
-  b_a = b - a
-  reductionop = @closure x -> (f(x) + f(x + b_a))
+  b_a = b .- a
+  reductionop = @closure x -> (f(x) .+ f(x .+ b_a))
   return applyquadrature(reductionop, +, x, w) * normalisation
 end
 
@@ -75,15 +76,15 @@ end
   return false
 end
 
-function quadhp(f::T, h::_Helper, a::Real, b::Real,
+function quadhp(f::T, h::_Helper, a, b,
     n::Int, l::Int, nrm::U) where {T<:Function, U<:Function}
   @assert -Inf < a < b < Inf "a = $a, b = $b"
   @assert ispow2(n) "n is $n"
   qp = quad(f, h, a, b, n)
-  qh = quad(f, h, a, (b + a) / 2, b, Int(n / 2))
-  hasconverged(qp, qh, h, l, nrm) && return @SVector [(qp + qh) / 2, @. nrm(qp - qh)]
-  reductionop = @closure i -> quadhp(f, h, a + i * (b - a) / h.split,
-    a + (i + 1) * (b - a) / h.split, 2n, l + 1, nrm)
+  qh = quad(f, h, a, (b .+ a) / 2, b, Int(n / 2))
+  hasconverged(qp, qh, h, l, nrm) && return @SVector [(qp + qh) / 2, @. nrm(qp .- qh)]
+  reductionop = @closure i -> quadhp(f, h, a .+ i * (b .- a) / h.split,
+    a .+ (i + 1) * (b .- a) / h.split, 2n, l + 1, nrm)
   return simdmapreduce(reductionop, +, 0:(h.split - 1))
 end
 
@@ -91,14 +92,14 @@ const default_order = 32
 const default_split = 2
 const default_max_depth = 8
 
-function quadhp(f::T, a::Real, b::Real; norm::U=abs,
+function quadhp(f::T, a, b; norm::U=abs,
                 rtol::Real=eps(), atol::Real=0.0,
                 order::Int=default_order, max_depth::Int=default_max_depth,
                 split::Int=default_split) where {T<:Function, U<:Function}
   return quadhp(f, _Helper(atol, rtol, max_depth, split), a, b, order, 0, norm)
 end
 
-function quadhp(f::T, ab::Real...; norm::U=abs,
+function quadhp(f::T, ab...; norm::U=abs,
                 rtol::Real=eps(), atol::Real=0.0,
                 order::Int=default_order, max_depth::Int=default_max_depth,
                 split::Int=default_split) where {T<:Function, U<:Function}

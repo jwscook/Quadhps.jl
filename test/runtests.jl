@@ -1,8 +1,8 @@
 using Quadhps
-using SpecialFunctions, QuadGK, Test
+using ForwardDiff, SpecialFunctions, QuadGK, Test
 
 @testset "Quadhps tests" begin
-  @testset "Test vs QuadGK" begin
+  @testset "Versus QuadGK" begin
     f(x) = 1 ./ (1 .+ x.^3)
     lower = 0.1
     upper = 10.0
@@ -20,7 +20,7 @@ using SpecialFunctions, QuadGK, Test
     @test a ≈ b atol=2 * eps()
   end
 
-  @testset "Testing accuracy" begin
+  @testset "Accuracy" begin
     a = Quadhps.quadhp(x->1.0, 0.0, 2.0, rtol=2*eps())
     @test a[1] ≈ 2.0 atol=10 * eps()
     @test a[2] ≈ 0.0 atol=10 * eps()
@@ -32,7 +32,7 @@ using SpecialFunctions, QuadGK, Test
     @test c[2] ≈ 0.0 atol=1000 * eps()
   end
 
-  @testset "Test intervals" begin
+  @testset "Intervals" begin
     g(x::Float64) = exp(-x^2)*besselj(1, x)*besselj(-1, x) * x^4
     g(x::Vector{T}) where {T} = g.(x)
  
@@ -42,5 +42,12 @@ using SpecialFunctions, QuadGK, Test
     c = Quadhps.quadhp(x->3 .* x.^2 .+ 1.0, 0.0, 2.0, 4.0, 5.0, rtol=120*eps())
     @test a[1] ≈ b[1]
     @test a[1] ≈ c[1]
+  end
+
+  @testset "ForwadDiff" begin
+    integrand = sin
+    differentiand(x) = Quadhps.quadhp(y->integrand(y[1]), 0.0, x[1])[1]
+    b = π/2
+    @test integrand(b) ≈ ForwardDiff.gradient(differentiand, [b])[1]
   end
 end
