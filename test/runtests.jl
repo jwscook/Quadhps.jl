@@ -49,5 +49,9 @@ using ForwardDiff, SpecialFunctions, QuadGK, Test
     differentiand(x) = Quadhps.quadhp(y->integrand(y[1]), 0.0, x[1])[1]
     b = π/2
     @test integrand(b) ≈ ForwardDiff.gradient(differentiand, [b])[1]
+    a = ForwardDiff.gradient(x->
+      Quadhps.quadhp(y->sin(y[1]*x[1]), 0.0, 1.0)[1],
+          [0.5])[1]
+    @test a ≈ 0.469181324769897
   end
 end
